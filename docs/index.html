@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#3b6cf4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="졸업 플래너">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>졸업 커리큘럼 플래너</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --panel:#ffffff; --line:#e3e5ea; --text:#1d1f24; --muted:#6b7280;
+    --accent:#3b6cf4; --accent-soft:#e8eefc; --danger:#d64545;
+    --c-major-req:#3b6cf4; --c-major-opt:#8b5cf6; --c-general:#10b981; --c-other:#f59e0b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#15171c; --panel:#1f2229; --line:#2e323b; --text:#e8eaf0; --muted:#9aa1b0; --accent-soft:#263252; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+  header{display:flex;align-items:center;gap:16px;padding:14px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;font-weight:700}
+  .stats{display:flex;gap:14px;flex-wrap:wrap;margin-left:auto;align-items:center}
+  .reqbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;padding:14px 20px 0}
+  .req{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+  .req-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .req-name{font-weight:700;font-size:14px}
+  .req-name small{font-weight:400;color:var(--muted);font-size:11px;margin-left:4px}
+  .req-val{font-size:12px;color:var(--muted);display:flex;align-items:baseline;gap:4px}
+  .req-val b{font-size:18px;color:var(--text)}
+  .req-val input{width:62px;font-size:15px;font-weight:700;text-align:right;border:1px solid var(--line);border-radius:6px;padding:2px 6px;background:var(--bg);color:var(--text)}
+  .bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+  .bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .25s}
+  .req.met .bar i{background:#10b981}
+  .req-status{font-size:12px;color:var(--muted)}
+  .req.met .req-status{color:#10b981;font-weight:600}
+  button{font-family:inherit;font-size:13px;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer}
+  button:hover{background:var(--accent-soft)}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button.primary:hover{opacity:.9}
+  button.danger{color:var(--danger)}
+  button.small{padding:3px 8px;font-size:12px}
+  .layout{display:grid;grid-template-columns:280px 1fr;gap:16px;padding:16px 20px;min-height:calc(100vh - 60px)}
+  @media(max-width:900px){
+    .layout{grid-template-columns:1fr}
+    .layout > aside{position:static;max-height:none}   /* 좁은 창: 사이드바를 고정하지 않고 위에 그냥 둠 */
+  }
+  aside{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;align-self:start;position:sticky;top:76px;max-height:calc(100vh - 92px)}
+  aside h2,main h2{font-size:14px;margin:0 0 6px;color:var(--muted);font-weight:600}
+  form{display:flex;flex-direction:column;gap:8px}
+  .row{display:flex;gap:8px}
+  input,select{font-family:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);width:100%}
+  input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .pool-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .sel-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+  .sel-bar select{width:auto;padding:3px 6px;font-size:12px}
+  .card.selectable{cursor:pointer}
+  .card.selected{outline:2px solid var(--accent);background:var(--accent-soft)}
+  .card .chk{margin:0 2px 0 0;width:15px;height:15px;flex:none;pointer-events:none}
+  .pool{flex:1;min-height:120px;overflow:auto;border:2px dashed var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px}
+  .pool.over,.sem-body.over{border-color:var(--accent);background:var(--accent-soft)}
+  .pool:empty::after,.sem-body:empty::after{content:"여기로 과목을 끌어다 놓으세요";color:var(--muted);font-size:12px;display:block;text-align:center;padding:14px 0}
+  .card{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--c-other);border-radius:8px;cursor:grab;-webkit-user-select:none;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .card:active{cursor:grabbing}
+  .card.dragging{opacity:.35}
+  .card.ghost{position:fixed;z-index:50;pointer-events:none;opacity:.9;box-shadow:0 8px 24px rgba(0,0,0,.25);transform:rotate(-1deg)}
+  body.is-dragging{cursor:grabbing;-webkit-user-select:none;user-select:none}
+  body.is-dragging *{-webkit-user-select:none;user-select:none}
+  .card{touch-action:none}
+  .card .name{flex:1;min-width:0;font-weight:500;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere}
+  .card .cr{font-size:12px;color:var(--muted);white-space:nowrap}
+  .card .term{font-size:10px;padding:1px 5px;border-radius:4px;background:var(--line);color:var(--muted);white-space:nowrap}
+  .card .term.t1{background:#fde8d7;color:#b45309} .card .term.t2{background:#dbeafe;color:#1d4ed8}
+  @media (prefers-color-scheme: dark){ .card .term.t1{background:#4a2a12;color:#fbbf86} .card .term.t2{background:#1e2f5a;color:#9ec1ff} }
+  .sem-body.bad{background:rgba(214,69,69,.08);outline:2px dashed var(--danger);outline-offset:-4px}
+  body.is-dragging .sem-body.bad, body.is-dragging .sem-body.bad *{cursor:not-allowed}
+  .sem-head .schol{font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;background:#fef3c7;color:#92400e;white-space:nowrap;margin-left:2px}
+  @media (prefers-color-scheme: dark){ .sem-head .schol{background:#4a3a0f;color:#fcd34d} }
+  /* 터치 기기(아이폰 등): 카드 본체는 스크롤, 오른쪽 손잡이(⠿)로만 끌기 */
+  .card .grip{display:none;touch-action:none;color:var(--muted);font-size:17px;padding:0 2px 0 4px;cursor:grab;flex:none;-webkit-user-select:none;user-select:none}
+  .card{-webkit-touch-callout:none}
+  @media (hover:none) and (pointer:coarse){
+    .card{touch-action:pan-y}
+    .card .grip{display:inline-block}
+    input,select{font-size:16px}          /* iOS에서 입력칸 포커스 시 확대 방지 */
+    header{padding-top:calc(14px + env(safe-area-inset-top))}
+    .layout{padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+  }
+  /* 맥 앱: 상단 바를 투명하게 쓰므로 신호등 버튼 아래로 헤더 내용을 내림 */
+  .mac-app header{padding-top:36px}
+  .mac-app aside{top:98px}
+  .sem-head .reset{border:none;background:none;color:var(--muted);font-size:15px;padding:0 4px;line-height:1;cursor:pointer}
+  .sem-head .reset:hover{color:var(--danger);background:none}
+  .card .x{border:none;background:none;color:var(--muted);font-size:14px;padding:0 2px;cursor:pointer;line-height:1}
+  .card .x:hover{color:var(--danger);background:none}
+  .card[data-cat="전공"]{border-left-color:var(--c-major-req)}
+  .card[data-cat="교양"]{border-left-color:var(--c-general)}
+  .card[data-cat="일반선택"]{border-left-color:var(--c-other)}
+  main{display:flex;flex-direction:column;gap:10px}
+  .main-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .main-head .spacer{flex:1}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));grid-auto-rows:min-content;gap:12px}
+  .sem{background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:180px}
+  .sem.extra{border-style:dashed;border-color:#c9a227;background:color-mix(in srgb, var(--panel) 92%, #f59e0b)}
+  .sem.extra .sem-head .title small{font-weight:400;color:var(--muted);font-size:11px;margin-left:4px}
+  .sem-head{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+  .sem-head .title{font-weight:700;font-size:14px;white-space:nowrap}
+  .sem-head .right{margin-left:auto;display:flex;align-items:baseline;gap:6px;white-space:nowrap}
+  .sem-head .sum{font-size:12px;color:var(--muted)}
+  .sem-head .sum b{color:var(--text);font-size:14px}
+  .sem-body{flex:1;padding:8px;display:flex;flex-direction:column;gap:6px;border-radius:0 0 12px 12px}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+  .legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+  .legend .a::before{background:var(--c-major-req)} .legend .b::before{background:var(--c-major-opt)} .legend .c::before{background:var(--c-general)} .legend .d::before{background:var(--c-other)}
+  .catsum{font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+  .hint{font-size:12px;color:var(--muted);line-height:1.5}
+  header .credit{font-size:12px;color:var(--muted);letter-spacing:.2px;margin-left:-4px;padding-top:3px;white-space:nowrap}
+  @media(max-width:700px){header .credit{display:none}}
+  .layout{min-height:auto}
+  /* modal */
+  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:20}
+  .backdrop.show{display:flex}
+  .modal{background:var(--panel);border-radius:12px;padding:18px;width:320px;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  .modal h3{margin:0 0 4px;font-size:16px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎓 졸업 커리큘럼 플래너</h1>
+  <span class="credit">Made with ❤️ by Claude</span>
+  <div class="stats">
+    <button id="btn-export" title="현재 계획을 파일로 저장">내보내기</button>
+    <button id="btn-import" title="저장한 파일 불러오기">불러오기</button>
+    <input type="file" id="file-import" accept="application/json" hidden>
+    <button id="btn-reset" class="danger">전체 초기화</button>
+  </div>
+</header>
+
+<section class="reqbar">
+  <div class="req" data-k="major">
+    <div class="req-top"><span class="req-name">전공</span><span class="req-val"><b class="req-sum">0</b> / <input class="req-target" type="number" min="0" step="1"> 학점 이상</span></div>
+    <div class="bar"><i></i></div><div class="req-status"></div>
+  </div>
+  <div class="req" data-k="general">
+    <div class="req-top"><span class="req-name">교양</span><span class="req-val"><b class="req-sum">0</b> / <input class="req-target" type="number" min="0" step="1"> 학점 이상</span></div>
+    <div class="bar"><i></i></div><div class="req-status"></div>
+  </div>
+  <div class="req" data-k="total">
+    <div class="req-top"><span class="req-name">총 졸업학점 <small>일반선택 포함 전부</small></span><span class="req-val"><b class="req-sum">0</b> / <input class="req-target" type="number" min="0" step="1"> 학점 이상</span></div>
+    <div class="bar"><i></i></div><div class="req-status"></div>
+  </div>
+</section>
+
+<div class="layout">
+  <aside>
+    <div>
+      <h2>과목 추가</h2>
+      <form id="add-form">
+        <input id="in-name" placeholder="과목명 (예: 자료구조)" required autocomplete="off">
+        <div class="row">
+          <input id="in-credits" type="number" min="0" step="0.5" placeholder="학점" value="3" required style="width:90px">
+          <select id="in-cat">
+            <option>전공</option><option>교양</option><option>일반선택</option>
+          </select>
+        </div>
+        <select id="in-term" title="개설 학기">
+          <option value="1">1학기 개설 (홀수 학기에만 배치)</option>
+          <option value="2">2학기 개설 (짝수 학기에만 배치)</option>
+          <option value="0">매학기 개설 (어디든 배치)</option>
+        </select>
+        <button class="primary" type="submit">추가 (Enter)</button>
+      </form>
+    </div>
+    <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+      <div class="pool-head">
+        <h2 style="margin:0">미배치 과목 <span id="pool-count" style="font-weight:400"></span></h2>
+        <button id="btn-sel" class="small">선택</button>
+      </div>
+      <div class="sel-bar" id="sel-bar" hidden>
+        <button id="sel-all" class="small">전체 선택</button>
+        <select id="sel-term" class="small">
+          <option value="">개설 학기 변경…</option>
+          <option value="1">→ 1학기 개설</option>
+          <option value="2">→ 2학기 개설</option>
+          <option value="0">→ 매학기 개설</option>
+        </select>
+        <button id="sel-del" class="small danger">삭제 (0)</button>
+      </div>
+      <div class="pool" id="pool" data-sem="0"></div>
+    </div>
+    <div class="legend"><span class="a">전공</span><span class="c">교양</span><span class="d">일반선택</span></div>
+    <p class="hint">카드를 마우스로 끌어서 학기 칸에 놓으세요. 1학기 개설 과목은 홀수 학기, 2학기 개설 과목은 짝수 학기에만 들어가요. 카드를 클릭하면 수정할 수 있어요. 입력한 내용은 자동 저장됩니다.</p>
+  </aside>
+
+  <main>
+    <div class="main-head">
+      <h2 style="margin:0">학기별 배치</h2>
+      <div class="catsum" id="catsum"></div>
+      <div class="spacer"></div>
+      <button id="btn-del-sem" class="small">마지막 학기 삭제</button>
+      <button id="btn-add-sem" class="small primary">+ 학기 추가</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </main>
+</div>
+
+<!-- 수정 모달 -->
+<div class="backdrop" id="edit-backdrop">
+  <div class="modal">
+    <h3>과목 수정</h3>
+    <input id="ed-name" placeholder="과목명">
+    <div class="row">
+      <input id="ed-credits" type="number" min="0" step="0.5" placeholder="학점" style="width:90px">
+      <select id="ed-cat"><option>전공</option><option>교양</option><option>일반선택</option></select>
+    </div>
+    <select id="ed-term">
+      <option value="1">1학기 개설</option><option value="2">2학기 개설</option><option value="0">매학기 개설</option>
+    </select>
+    <select id="ed-sem"></select>
+    <div class="row" style="justify-content:flex-end">
+      <button id="ed-cancel">취소</button>
+      <button id="ed-save" class="primary">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- 데이터 ----------
+const KEY = 'curriculum-planner-v1';
+const CATS = ['전공','교양','일반선택'];
+const EXTRA_SEM = 999; // 학점인정과정 (정규 학기 외) 칸의 번호
+const SCHOL_MIN = 18;  // 성적우수장학 신청 조건 학점
+let state = normalize(load());
+
+function load(){
+  // 맥 앱 안에서 실행 중이면 앱이 넣어준 저장 데이터를 먼저 사용
+  try{
+    const s = window.__initialState;
+    if(s && Array.isArray(s.courses)) return s;
+  }catch(e){}
+  try{
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if(s && Array.isArray(s.courses)) return s;
+  }catch(e){}
+  return defaultState();
+}
+function defaultState(){ return { courses: [], semCount: 8, req: { major: 51, general: 24, total: 130 } }; }
+// 예전 저장 형식 호환
+function normalize(s){
+  s.req = s.req || { major: 51, general: 24, total: (s.target ?? 130) };
+  delete s.target; delete s.app; delete s.format; delete s.savedAt;
+  s.semCount = s.semCount || 8;
+  s.courses.forEach(c => {
+    if(c.cat === '기타') c.cat = '일반선택';
+    if(c.cat === '전공필수' || c.cat === '전공선택') c.cat = '전공';
+    if(!CATS.includes(c.cat)) c.cat = '일반선택';
+    if(c.term !== 1 && c.term !== 2) c.term = 0;   // 0 = 매학기
+    if(!canPlace(c, c.sem)) c.sem = 0;             // 홀짝이 안 맞으면 미배치로
+  });
+  return s;
+}
+// 저장용 JSON: 어떤 앱의 파일인지 알 수 있도록 식별자를 함께 기록
+function serialize(pretty){
+  const out = { app: 'graduation-curriculum-planner', format: 2, savedAt: new Date().toISOString(),
+                courses: state.courses, semCount: state.semCount, req: state.req };
+  return pretty ? JSON.stringify(out, null, 2) : JSON.stringify(out);
+}
+function save(){
+  const json = serialize(false);
+  // 맥 앱: 네이티브 쪽으로 넘겨 파일로 저장
+  try{ if(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.store) window.webkit.messageHandlers.store.postMessage(json); }catch(e){}
+  // 브라우저: localStorage
+  try{ localStorage.setItem(KEY, json); }catch(e){}
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+// 과목을 해당 학기에 넣을 수 있는지 (홀수/짝수 학기 제한)
+function canPlace(c, sem){
+  if(!sem || sem === EXTRA_SEM || !c.term) return true;
+  return sem % 2 === 1 ? c.term === 1 : c.term === 2;
+}
+function termLabel(t){ return t === 1 ? '1학기' : t === 2 ? '2학기' : ''; }
+// 학기 비우기 (과목을 미배치로)
+function resetSem(n){
+  const inSem = state.courses.filter(c=>c.sem===n);
+  if(!inSem.length) return;
+  if(!confirm(`${semLabel(n)}에 배치된 ${inSem.length}개 과목을 모두 미배치로 되돌릴까요?`)) return;
+  inSem.forEach(c=>c.sem=0); render();
+}
+
+// 학기 번호 -> 표시 이름
+function semLabel(n){
+  if(n === EXTRA_SEM) return '학점인정과정';
+  if(n <= 8){
+    const year = Math.ceil(n/2);
+    const term = (n % 2 === 1) ? 1 : 2;
+    return `${year}학년 ${term}학기 (${n}학기)`;
+  }
+  return `${n}학기`;
+}
+function fmt(n){ return Number.isInteger(n) ? n : n.toFixed(1); }
+
+// ---------- 렌더링 ----------
+const grid = document.getElementById('grid');
+const pool = document.getElementById('pool');
+
+function render(){
+  // 학기 칸
+  grid.innerHTML = '';
+  for(let n=1; n<=state.semCount; n++){
+    const sem = document.createElement('div');
+    sem.className = 'sem';
+    const list = state.courses.filter(c => c.sem === n);
+    const sum = list.reduce((a,c)=>a+c.credits,0);
+    const schol = sum >= SCHOL_MIN ? `<span class="schol" title="${SCHOL_MIN}학점 이상: 성적우수장학 신청 조건 충족">✦ 장학</span>` : '';
+    sem.innerHTML = `<div class="sem-head"><span class="title">${semLabel(n)}</span><span class="right">${schol}<span class="sum"><b>${fmt(sum)}</b> 학점</span>${list.length ? `<button class="reset" title="이 학기 비우기">↺</button>` : ''}</span></div>`;
+    const rb = sem.querySelector('.reset'); if(rb) rb.addEventListener('click', ()=>resetSem(n));
+    const body = document.createElement('div');
+    body.className = 'sem-body'; body.dataset.sem = n;
+    list.forEach(c => body.appendChild(cardEl(c)));
+    attachDrop(body);
+    sem.appendChild(body);
+    grid.appendChild(sem);
+  }
+  // 학점인정과정 칸 (항상 마지막 학기 뒤)
+  {
+    const sem = document.createElement('div');
+    sem.className = 'sem extra';
+    const list = state.courses.filter(c => c.sem === EXTRA_SEM);
+    const sum = list.reduce((a,c)=>a+c.credits,0);
+    sem.innerHTML = `<div class="sem-head"><span class="title">학점인정과정 <small>정규 학기 외</small></span><span class="right"><span class="sum"><b>${fmt(sum)}</b> 학점</span>${list.length ? `<button class="reset" title="비우기">↺</button>` : ''}</span></div>`;
+    const rb = sem.querySelector('.reset'); if(rb) rb.addEventListener('click', ()=>resetSem(EXTRA_SEM));
+    const body = document.createElement('div');
+    body.className = 'sem-body'; body.dataset.sem = EXTRA_SEM;
+    list.forEach(c => body.appendChild(cardEl(c)));
+    sem.appendChild(body);
+    grid.appendChild(sem);
+  }
+  // 미배치
+  pool.innerHTML = '';
+  const unplaced = state.courses.filter(c => !c.sem);
+  unplaced.forEach(c => pool.appendChild(cardEl(c)));
+  document.getElementById('pool-count').textContent = unplaced.length ? `(${unplaced.length})` : '';
+  // 선택 모드 UI
+  if(!unplaced.length && selMode){ selMode = false; selected.clear(); }
+  for(const id of [...selected]) if(!unplaced.some(c=>c.id===id)) selected.delete(id);
+  document.getElementById('sel-bar').hidden = !selMode;
+  document.getElementById('btn-sel').textContent = selMode ? '선택 취소' : '선택';
+  document.getElementById('btn-sel').hidden = !unplaced.length;
+  document.getElementById('sel-del').textContent = `삭제 (${selected.size})`;
+  document.getElementById('sel-del').disabled = !selected.size;
+  document.getElementById('sel-term').disabled = !selected.size;
+  document.getElementById('sel-all').textContent = (selected.size && selected.size === unplaced.length) ? '전체 해제' : '전체 선택';
+  // 졸업 요건
+  const placedList = state.courses.filter(c=>c.sem);
+  const sumOf = f => placedList.filter(f).reduce((a,c)=>a+c.credits,0);
+  const sums = {
+    major: sumOf(c=>c.cat==='전공'),
+    general: sumOf(c=>c.cat==='교양'),
+    total: sumOf(()=>true)
+  };
+  document.querySelectorAll('.req').forEach(el => {
+    const k = el.dataset.k, got = sums[k], need = state.req[k] || 0;
+    el.querySelector('.req-sum').textContent = fmt(got);
+    const inp = el.querySelector('.req-target');
+    if(document.activeElement !== inp) inp.value = need;
+    const met = got >= need;
+    el.classList.toggle('met', met);
+    el.querySelector('.bar i').style.width = (need ? Math.min(got/need*100,100) : 100) + '%';
+    el.querySelector('.req-status').textContent = met
+      ? `✓ 충족${got>need ? ` (+${fmt(got-need)}학점 초과)` : ''}`
+      : `${fmt(need-got)}학점 더 필요`;
+  });
+  // 구분별 합계
+  document.getElementById('catsum').innerHTML = CATS.map(cat=>{
+    const s = sumOf(c=>c.cat===cat);
+    return s ? `<span>${cat} <b>${fmt(s)}</b></span>` : '';
+  }).join('');
+  document.getElementById('btn-del-sem').disabled = state.semCount <= 1;
+  save();
+}
+
+function cardEl(c){
+  const el = document.createElement('div');
+  el.className = 'card'; el.dataset.id = c.id; el.dataset.cat = c.cat;
+  const selectable = selMode && !c.sem;
+  el.innerHTML = `${selectable ? `<input type="checkbox" class="chk" ${selected.has(c.id)?'checked':''}>` : ''}<span class="name" title="${c.name}">${c.name}</span>${c.term ? `<span class="term t${c.term}">${termLabel(c.term)}</span>` : ''}<span class="cr">${fmt(c.credits)}학점</span><button class="x" title="삭제">×</button><span class="grip" title="끌어서 이동">⠿</span>`;
+  if(selectable){
+    el.classList.add('selectable'); if(selected.has(c.id)) el.classList.add('selected');
+    el.addEventListener('click', e => { e.stopPropagation(); if(selected.has(c.id)) selected.delete(c.id); else selected.add(c.id); render(); }, true);
+  }
+  el.querySelector('.x').addEventListener('click', e => {
+    e.stopPropagation();
+    if(confirm(`"${c.name}" 과목을 삭제할까요?`)){
+      state.courses = state.courses.filter(x=>x.id!==c.id); render();
+    }
+  });
+  el.addEventListener('mousedown', e => { if(!e.target.closest('.x')) e.preventDefault(); });
+  el.addEventListener('pointerdown', e => {
+    if(selectable || e.button !== 0 || e.target.closest('.x')) return;
+    if(e.pointerType === 'touch' && !e.target.closest('.grip')) return;   // 손가락: 손잡이 외에는 스크롤
+    e.preventDefault();
+    try{ window.getSelection().removeAllRanges(); }catch(_){}
+    const r = el.getBoundingClientRect();
+    drag = { id: c.id, course: c, el, sx: e.clientX, sy: e.clientY, ox: e.clientX - r.left, oy: e.clientY - r.top, w: r.width, moved: false, ghost: null, zone: null };
+  });
+  el.addEventListener('click', () => { if(!justDragged) openEdit(c.id); });
+  return el;
+}
+
+// ---------- 드래그 앤 드롭 (포인터 기반) ----------
+let drag = null, justDragged = false;
+let selMode = false; const selected = new Set();
+function attachDrop(zone){ /* 드롭 영역 표시는 포인터 이동 중에 처리 */ }
+function zoneAt(x, y){
+  const t = document.elementFromPoint(x, y);
+  return t ? t.closest('.sem-body, .pool') : null;
+}
+function updateZone(x, y){
+  const z = zoneAt(x, y);
+  if(z !== drag.zone){
+    if(drag.zone) drag.zone.classList.remove('over','bad');
+    if(z) z.classList.add(canPlace(drag.course, Number(z.dataset.sem)) ? 'over' : 'bad');
+    drag.zone = z;
+  }
+}
+// 끌고 있는 채로 화면 위/아래 가장자리에 가면 자동 스크롤 (휴대폰에서 필요)
+function autoScroll(){
+  if(!drag || !drag.moved) return;
+  const m = 70, y = drag.lastY, x = drag.lastX;
+  if(y < m) scrollBy(0, -Math.ceil((m - y) / 5));
+  else if(y > innerHeight - m) scrollBy(0, Math.ceil((y - (innerHeight - m)) / 5));
+  updateZone(x, y);
+  requestAnimationFrame(autoScroll);
+}
+document.addEventListener('pointermove', e => {
+  if(!drag) return;
+  drag.lastX = e.clientX; drag.lastY = e.clientY;
+  if(!drag.moved){
+    if(Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 5) return;
+    drag.moved = true;
+    const g = drag.el.cloneNode(true);
+    g.classList.add('ghost'); g.style.width = drag.w + 'px';
+    document.body.appendChild(g); drag.ghost = g;
+    drag.el.classList.add('dragging');
+    document.body.classList.add('is-dragging');
+    try{ window.getSelection().removeAllRanges(); }catch(_){}
+    requestAnimationFrame(autoScroll);
+  }
+  drag.ghost.style.left = (e.clientX - drag.ox) + 'px';
+  drag.ghost.style.top = (e.clientY - drag.oy) + 'px';
+  updateZone(e.clientX, e.clientY);
+  e.preventDefault();
+});
+function endDrag(e){
+  if(!drag) return;
+  const d = drag; drag = null;
+  if(!d.moved) return;
+  d.ghost.remove(); d.el.classList.remove('dragging');
+  document.body.classList.remove('is-dragging');
+  if(d.zone) d.zone.classList.remove('over','bad');
+  justDragged = true; setTimeout(()=>justDragged=false, 0);
+  if(e.type === 'pointerup' && d.zone && canPlace(d.course, Number(d.zone.dataset.sem))){
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const overCard = under && under.closest('.card');
+    moveCourse(d.id, Number(d.zone.dataset.sem), overCard ? overCard.dataset.id : null);
+  }
+}
+document.addEventListener('pointerup', endDrag);
+document.addEventListener('pointercancel', endDrag);
+
+function moveCourse(id, sem, beforeId){
+  const idx = state.courses.findIndex(c=>c.id===id);
+  if(idx<0) return;
+  if(!canPlace(state.courses[idx], sem)) return;
+  const [course] = state.courses.splice(idx,1);
+  course.sem = sem;
+  if(beforeId && beforeId !== id){
+    const bi = state.courses.findIndex(c=>c.id===beforeId);
+    state.courses.splice(bi<0 ? state.courses.length : bi, 0, course);
+  } else state.courses.push(course);
+  render();
+}
+
+// ---------- 과목 추가 ----------
+document.getElementById('add-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = document.getElementById('in-name').value.trim();
+  const credits = parseFloat(document.getElementById('in-credits').value);
+  if(!name || isNaN(credits)) return;
+  state.courses.push({ id: uid(), name, credits, cat: document.getElementById('in-cat').value, term: Number(document.getElementById('in-term').value), sem: 0 });
+  document.getElementById('in-name').value = ''; document.getElementById('in-credits').value = '3';
+  document.getElementById('in-name').focus();
+  render();
+});
+
+// ---------- 미배치 과목 선택 모드 ----------
+document.getElementById('btn-sel').addEventListener('click', () => { selMode = !selMode; selected.clear(); render(); });
+document.getElementById('sel-all').addEventListener('click', () => {
+  const unplaced = state.courses.filter(c=>!c.sem);
+  if(selected.size === unplaced.length) selected.clear(); else unplaced.forEach(c=>selected.add(c.id));
+  render();
+});
+document.getElementById('sel-del').addEventListener('click', () => {
+  if(!selected.size) return;
+  if(!confirm(`선택한 ${selected.size}개 과목을 삭제할까요? (되돌릴 수 없어요)`)) return;
+  state.courses = state.courses.filter(c=>!selected.has(c.id));
+  selected.clear(); render();
+});
+document.getElementById('sel-term').addEventListener('change', e => {
+  const v = e.target.value; e.target.value = '';
+  if(v === '' || !selected.size) return;
+  const t = Number(v);
+  state.courses.forEach(c => { if(selected.has(c.id)) c.term = t; });
+  render();
+});
+
+// ---------- 학기 추가/삭제 ----------
+document.getElementById('btn-add-sem').addEventListener('click', () => { state.semCount++; render(); });
+document.getElementById('btn-del-sem').addEventListener('click', () => {
+  if(state.semCount <= 1) return;
+  const n = state.semCount;
+  const inSem = state.courses.filter(c=>c.sem===n);
+  if(inSem.length && !confirm(`${semLabel(n)}에 ${inSem.length}개 과목이 있어요. 미배치로 되돌리고 학기를 삭제할까요?`)) return;
+  inSem.forEach(c=>c.sem=0);
+  state.semCount--; render();
+});
+
+// ---------- 졸업 요건 숫자 수정 ----------
+document.querySelectorAll('.req-target').forEach(inp => {
+  inp.addEventListener('input', e => {
+    const k = e.target.closest('.req').dataset.k;
+    state.req[k] = parseFloat(e.target.value) || 0; render();
+  });
+});
+
+// ---------- 수정 모달 ----------
+const backdrop = document.getElementById('edit-backdrop');
+let editingId = null;
+function openEdit(id){
+  const c = state.courses.find(x=>x.id===id); if(!c) return;
+  editingId = id;
+  document.getElementById('ed-name').value = c.name;
+  document.getElementById('ed-credits').value = c.credits;
+  document.getElementById('ed-cat').value = c.cat;
+  document.getElementById('ed-term').value = c.term || 0;
+  fillSemOptions(c.term || 0, c.sem || 0);
+  backdrop.classList.add('show');
+  document.getElementById('ed-name').focus();
+}
+function fillSemOptions(term, current){
+  const semSel = document.getElementById('ed-sem');
+  const probe = { term };
+  semSel.innerHTML = `<option value="0">미배치</option>` +
+    Array.from({length:state.semCount},(_,i)=>{
+      const n = i+1, ok = canPlace(probe, n);
+      return `<option value="${n}" ${ok?'':'disabled'}>${semLabel(n)}${ok?'':' (개설 학기 아님)'}</option>`;
+    }).join('') +
+    `<option value="${EXTRA_SEM}">학점인정과정</option>`;
+  semSel.value = canPlace(probe, current) ? current : 0;
+}
+// 수정 창에서 개설 학기를 바꾸면 학기 목록도 다시 계산
+document.getElementById('ed-term').addEventListener('change', e => {
+  fillSemOptions(Number(e.target.value), Number(document.getElementById('ed-sem').value));
+});
+document.getElementById('ed-cancel').addEventListener('click', ()=>backdrop.classList.remove('show'));
+backdrop.addEventListener('click', e => { if(e.target===backdrop) backdrop.classList.remove('show'); });
+document.getElementById('ed-save').addEventListener('click', () => {
+  const c = state.courses.find(x=>x.id===editingId); if(!c) return;
+  const name = document.getElementById('ed-name').value.trim();
+  const credits = parseFloat(document.getElementById('ed-credits').value);
+  if(!name || isNaN(credits)) return;
+  c.name = name; c.credits = credits; c.cat = document.getElementById('ed-cat').value;
+  c.term = Number(document.getElementById('ed-term').value);
+  c.sem = Number(document.getElementById('ed-sem').value);
+  if(!canPlace(c, c.sem)) c.sem = 0;
+  backdrop.classList.remove('show'); render();
+});
+document.addEventListener('keydown', e => { if(e.key==='Escape') backdrop.classList.remove('show'); });
+
+// ---------- 내보내기 / 불러오기 / 초기화 ----------
+document.getElementById('btn-export').addEventListener('click', () => {
+  const blob = new Blob([serialize(true)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `graduation-curriculum-planner-${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+});
+document.getElementById('btn-import').addEventListener('click', ()=>document.getElementById('file-import').click());
+document.getElementById('file-import').addEventListener('change', e => {
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const s = JSON.parse(r.result);
+      if(!Array.isArray(s.courses)) throw 0;
+      state = normalize(s); render();
+    }catch{ alert('파일 형식이 올바르지 않아요.'); }
+  };
+  r.readAsText(f); e.target.value='';
+});
+document.getElementById('btn-reset').addEventListener('click', () => {
+  if(confirm('모든 과목과 학기 설정을 지울까요? (되돌릴 수 없어요)')){
+    state = defaultState(); render();
+  }
+});
+
+render();
+// 창 크기가 바뀌면 잠시 후 다시 그림 (WebKit 레이아웃 갱신 누락 대비)
+let resizeTimer; addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 150); });
+// 웹(https)으로 열렸을 때 오프라인에서도 열리도록 캐시 등록
+if('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
